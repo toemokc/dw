@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
     <link rel="stylesheet" href="https://markdownlivepreview.com/assets/index-C-vOJggO.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.7.0/dist/mermaid.min.js"></script>
 </head>
 <body>
     <div id="output" class="content markdown-body">
@@ -16,8 +17,8 @@
       <li>整合部門作業、減少人工錯誤</li>
       </ul>
       <hr>
-      <h2>二、導入流程圖（高階流程）</h2>
-      <pre><code class="language-mermaid">flowchart TD
+      <h2>二、導入流程圖</h2>
+      <div class="mermaid">flowchart TD
         A[前期規劃與立案] --&gt; B[需求訪談與流程盤點]
         B --&gt; C[系統選型與供應商評估]
         C --&gt; D[ERP設計與參數設定]
@@ -26,7 +27,7 @@
         F --&gt; G[教育訓練與試營運]
         G --&gt; H[正式上線]
         H --&gt; I[持續優化與維運]
-      </code></pre>
+      </div>
       <hr>
       <h2>三、模組建議與功能重點</h2>
       <h3>1. 採購模組（Procurement）</h3>
