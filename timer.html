@@ -222,6 +222,18 @@ createApp({
     let toastId = 0;
     const allPreview = ref(true);
 
+    // 設定動態title
+    const updateDocumentTitle = () => {
+      if (isRunning.value || pauseRemain !== null || isTimerEnd.value) {
+        const h = String(currentTime.value.hours).padStart(2, '0');
+        const m = String(currentTime.value.minutes).padStart(2, '0');
+        const s = String(currentTime.value.seconds).padStart(2, '0');
+        document.title = `${h}:${m}:${s} - 倒數計時器`;
+      } else {
+        document.title = '倒數計時器';
+      }
+    };
+
     // Modal
     const showModal = ref(false);
     const modalMessage = ref('');
@@ -277,6 +289,7 @@ createApp({
         isRunning.value = false;
         endTime = null;
       }
+      updateDocumentTitle();
     };
 
     const startTimer = () => {
@@ -296,6 +309,7 @@ createApp({
         timerId.value = setInterval(updateTime, 200);
         pauseRemain = null;
       }
+      updateDocumentTitle();
     };
 
     const pauseTimer = () => {
@@ -309,6 +323,7 @@ createApp({
         pauseRemain = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
       }
       endTime = null;
+      updateDocumentTitle();
     };
 
     const resetTimer = () => {
@@ -324,7 +339,12 @@ createApp({
       isRunning.value = false;
       endTime = null;
       pauseRemain = null;
+      updateDocumentTitle();
     };
+    
+    watch(currentTime, () => {
+      updateDocumentTitle();
+    }, { deep: true });
 
     const playSound = (loop = false) => {
       stopSound();
