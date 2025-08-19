@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>倒數計時器</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <!-- Bootstrap CSS & Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    .modal-backdrop { z-index: 1050; }
+  </style>
+</head>
+<body>
+<div id="app" class="container my-4">
+  <div class="card mb-4">
+    <div class="card-body text-center">
+      <p v-if="timeInputs.length > 0" class="mb-2">
+        <h1 v-if="timeInputs[displayCycleNumber-1]">{{ timeInputs[displayCycleNumber-1].label }}</h1>
+      </p>
+      <p class="display-3 text-primary mb-3 fw-bold">
+        {{ String(currentTime.hours).padStart(2, '0') }}:
+        {{ String(currentTime.minutes).padStart(2, '0') }}:
+        {{ String(currentTime.seconds).padStart(2, '0') }}
+      </p>
+      <div class="btn-group mb-2" role="group">
+        <button class="btn btn-success" @click="startTimer" :disabled="isRunning || isTimerEnd || timeInputs.length === 0"><i class="bi bi-play-fill"></i></button>
+        <button class="btn btn-secondary" @click="pauseTimer" :disabled="!isRunning || isTimerEnd"><i class="bi bi-pause-fill"></i></button>
+        <button class="btn btn-warning" @click="resetTimer" :disabled="timeInputs.length === 0"><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
+      <div v-if="isTimerEnd" class="alert alert-success mt-2">
+        <p v-if="isLastCycle && timeInputs.length > 0">時間到</p>
+        <p v-else-if="timeInputs.length > 0">
+          <button class="btn btn-success" @click="startNextCycle">開始下一組</button>
+        </p>
+      </div>
+    </div>
+  </div>
+  <!-- 設定倒數時間 -->
+  <div class="card mb-4">
+    <div class="card-header">設定倒數時間</div>
+    <div class="card-body">
+      <div v-if="timeInputs.length === 0" class="alert alert-info mb-3">
+        目前沒有任何倒數時間組。請點擊「新增一組」開始設定。
+      </div>
+      <div v-for="(time, index) in timeInputs" :key="index" class="row g-2 align-items-center mb-2">
+        <div class="col-md-3">
+          <input type="text" class="form-control" v-model="time.label" placeholder="請輸入名稱">
+        </div>
+        <div class="col input-group">
+          <input
+            type="number"
+            class="form-control"
+            v-model.number="time.hours"
+            min="0"
+            max="23"
+            placeholder="時"
+            @change="validateTimeInput(time, 'hours')"
+            @blur="validateTimeInput(time, 'hours')"
+          ><span class="input-group-text">時</span>
+        </div>
+        <div class="col input-group">
+          <input
+            type="number"
+            class="form-control"
+            v-model.number="time.minutes"
+            min="0"
+            max="59"
+            placeholder="分"
+            @change="validateTimeInput(time, 'minutes')"
+            @blur="validateTimeInput(time, 'minutes')"
+          ><span class="input-group-text">分</span>
+        </div>
+        <div class="col input-group">
+          <input
+            type="number"
+            class="form-control"
+            v-model.number="time.seconds"
+            min="0"
+            max="59"
+            placeholder="秒"
+            @change="validateTimeInput(time, 'seconds')"
+            @blur="validateTimeInput(time, 'seconds')"
+          ><span class="input-group-text">秒</span>
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-danger" @click="removeTimeInput(index)" :disabled="timeInputs.length <= 0">刪除</button>
+        </div>
+      </div>
+      <button class="btn btn-primary mt-2" @click="addTimeInput">新增一組</button>
+    </div>
+  </div>
+  <!-- 快捷鍵 -->
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>快捷鍵</span>
+      <button class="btn btn-info btn-sm" @click="toggleAllPreview">
+        {{ allPreview ? '隱藏預覽' : '預覽全部' }}
+      </button>
+    </div>
+    <div class="card-body">
+      <div class="input-group mb-3">
+        <input type="text" class="form-control" v-model="newShortcutName" placeholder="輸入快捷鍵名稱">
+        <button class="btn btn-dark" @click="saveAsShortcut" :disabled="timeInputs.length === 0">儲存為快捷鍵</button>
+      </div>
+      <div v-if="shortcuts.length === 0" class="alert alert-secondary">
+        還沒有儲存任何快捷鍵。
+      </div>
+      <ul class="list-group">
+        <li v-for="(shortcut, index) in shortcuts" :key="index" class="list-group-item">
+          <div>
+            <span>
+              <strong>{{ shortcut.name }}</strong>
+              <span class="badge bg-secondary ms-2">{{ shortcut.times.length }} 組</span>
+              <button class="btn btn-sm btn-warning ms-2" @click="shortcut.showDetail = !shortcut.showDetail">預覽</button>
+              <button class="btn btn-sm btn-success ms-2" @click="loadShortcut(shortcut)">載入</button>
+              <button class="btn btn-sm btn-danger ms-2" @click="deleteShortcut(index)">刪除</button>
+              <div v-if="shortcut.showDetail" class="mt-2">
+                <table class="table table-group-divider table-hover table-sm mb-0 ">
+                  <tbody>
+                    <tr v-for="(time, i) in shortcut.times" :key="i">
+                      <td>{{ time.label }}</td>
+                      <td>{{ time.hours }} 時 {{ time.minutes }} 分 {{ time.seconds }} 秒</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </span>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+  <!-- Toast stacking container -->
+  <div
+    aria-live="polite"
+    aria-atomic="true"
+    class="position-fixed bottom-0 end-0 p-3"
+    style="z-index: 9999; min-width: 320px;"
+  >
+    <div v-for="toast in toastList" :key="toast.id"
+      :id="`toast-${toast.id}`"
+      :class="['toast', 'align-items-center', 'border-0', 'position-relative', 'mb-2', `text-bg-${toast.type}`]"
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
+      style="display:block;"
+    >
+      <div class="d-flex">
+        <div class="toast-body">
+          {{ toast.message }}
+        </div>
+        <button
+          type="button"
+          class="btn-close btn-close-white me-2 m-auto"
+          aria-label="Close"
+          @click="toastList = toastList.filter(t => t.id !== toast.id)"
+        ></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal fade" tabindex="-1" :class="{ show: showModal }" :style="{ display: showModal ? 'block' : 'none' }" aria-modal="true" role="dialog">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">確認</h5>
+          <button type="button" class="btn-close" @click="showModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <p>{{ modalMessage }}</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="showModal = false">取消</button>
+          <button type="button" class="btn btn-primary" @click="modalConfirmCallback && modalConfirmCallback()">確定</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div v-if="showModal" class="modal-backdrop fade show"></div>
+</div>
+<!-- Vue, Bootstrap JS -->
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const { createApp, ref, computed, nextTick, onMounted, watch } = Vue;
+
+createApp({
+  setup() {
+    // Data
+    const defaultShortcuts = [
+      {
+        name: '番茄鐘',
+        times: [
+          { hours: 0, minutes: 25, seconds: 0, label: '工作' },
+          { hours: 0, minutes: 5, seconds: 0, label: '休息' }
+        ]
+      },
+      {
+        name: '健身',
+        times: [
+          { hours: 0, minutes: 1, seconds: 0, label: '熱身' },
+          { hours: 0, minutes: 3, seconds: 0, label: '運動' },
+          { hours: 0, minutes: 1, seconds: 0, label: '休息' }
+        ]
+      }
+    ];
+    const timeInputs = ref([
+      { hours: 0, minutes: 8, seconds: 30, label: '三顆蛋' }
+    ]);
+    const currentTime = ref({ ...timeInputs.value[0] });
+    const isRunning = ref(false);
+    const timerId = ref(null);
+    const currentCycle = ref(0);
+    const isTimerEnd = ref(false);
+    const currentAudio = ref(null);
+
+    const shortcuts = ref(JSON.parse(JSON.stringify(defaultShortcuts)));
+    const newShortcutName = ref('');
+    const toastList = ref([]);
+    let toastId = 0;
+    const allPreview = ref(true);
+
+    // Modal
+    const showModal = ref(false);
+    const modalMessage = ref('');
+    const modalConfirmCallback = ref(null);
+
+    // 初始化時全部 showDetail = true
+    shortcuts.value.forEach(shortcut => {
+      shortcut.showDetail = true;
+    });
+
+    const toggleAllPreview = () => {
+      allPreview.value = !allPreview.value;
+      shortcuts.value.forEach(shortcut => {
+        shortcut.showDetail = allPreview.value;
+      });
+    };
+
+    const displayCycleNumber = computed(() => currentCycle.value + 1);
+    const isLastCycle = computed(() => currentCycle.value === timeInputs.value.length - 1);
+
+    const updateTimeDisplay = () => {
+      if (timeInputs.value.length > 0) {
+        currentTime.value = { ...timeInputs.value[currentCycle.value] };
+      } else {
+        currentTime.value = { hours: 0, minutes: 0, seconds: 0, label: '' };
+      }
+    };
+
+    const updateTime = () => {
+      if (currentTime.value.seconds > 0) {
+        currentTime.value.seconds--;
+      } else if (currentTime.value.minutes > 0) {
+        currentTime.value.minutes--;
+        currentTime.value.seconds = 59;
+      } else if (currentTime.value.hours > 0) {
+        currentTime.value.hours--;
+        currentTime.value.minutes = 59;
+        currentTime.value.seconds = 59;
+      } else {
+        clearInterval(timerId.value);
+        timerId.value = null;
+        playSound(true);
+        isTimerEnd.value = true;
+      }
+    };
+
+    const startTimer = () => {
+      if (!isRunning.value && !isTimerEnd.value && timeInputs.value.length > 0) {
+        isRunning.value = true;
+        timerId.value = setInterval(updateTime, 1000);
+      }
+    };
+
+    const pauseTimer = () => {
+      if (timerId.value !== null) {
+        clearInterval(timerId.value);
+        timerId.value = null;
+      }
+      isRunning.value = false;
+    };
+
+    const resetTimer = () => {
+      pauseTimer();
+      stopSound();
+      currentCycle.value = 0;
+      isTimerEnd.value = false;
+      if (timeInputs.value.length > 0) {
+        currentTime.value = { ...timeInputs.value[currentCycle.value] };
+      } else {
+        currentTime.value = { hours: 0, minutes: 0, seconds: 0, label: '' };
+      }
+      isRunning.value = false;
+    };
+
+    const playSound = (loop = false) => {
+      stopSound();
+      const audio = new Audio('https://cdn.pixabay.com/audio/2022/03/13/audio_1a8216f82a.mp3');
+      audio.loop = loop;
+      audio.play();
+      currentAudio.value = audio;
+    };
+
+    const stopSound = () => {
+      if (currentAudio.value) {
+        currentAudio.value.pause();
+        currentAudio.value.currentTime = 0;
+        currentAudio.value = null;
+      }
+    };
+
+    const startNextCycle = () => {
+      stopSound();
+      isTimerEnd.value = false;
+      pauseTimer();
+      currentCycle.value++;
+      if (currentCycle.value < timeInputs.value.length) {
+        currentTime.value = { ...timeInputs.value[currentCycle.value] };
+        startTimer();
+      } else {
+        resetTimer();
+      }
+    };
+
+    const addTimeInput = () => {
+      timeInputs.value.push({
+        hours: 0,
+        minutes: 0,
+        seconds: 3,
+        label: `組${timeInputs.value.length + 1}`
+      });
+      if (timeInputs.value.length === 1) {
+        currentCycle.value = 0;
+        updateTimeDisplay();
+      }
+    };
+
+    const removeTimeInput = (index) => {
+      if (timeInputs.value.length > 1) {
+        timeInputs.value.splice(index, 1);
+        if (currentCycle.value >= timeInputs.value.length) {
+          currentCycle.value = timeInputs.value.length - 1;
+        }
+        updateTimeDisplay();
+      } else {
+        timeInputs.value = [];
+        currentCycle.value = 0;
+        updateTimeDisplay();
+      }
+      resetTimer();
+    };
+
+    const validateTimeInput = (time, field) => {
+      if (field === 'hours') {
+        if (time.hours < 0) time.hours = 0;
+        if (time.hours > 23) time.hours = 23;
+      } else if (field === 'minutes') {
+        if (time.minutes < 0) time.minutes = 0;
+        if (time.minutes > 59) time.minutes = 59;
+      } else if (field === 'seconds') {
+        if (time.seconds < 0) time.seconds = 0;
+        if (time.seconds > 59) time.seconds = 59;
+      }
+    };
+
+    const showShortcutMessage = async (message, isError = false) => {
+      const id = ++toastId;
+      toastList.value.push({
+        id,
+        message,
+        type: isError ? 'danger' : 'success',
+        show: true,
+      });
+      await nextTick();
+      // Bootstrap toast optional, just show for 5 seconds
+      setTimeout(() => {
+        toastList.value = toastList.value.filter(t => t.id !== id);
+      }, 5000);
+    };
+
+    const showConfirmModal = (message, onConfirm) => {
+      modalMessage.value = message;
+      modalConfirmCallback.value = () => {
+        onConfirm();
+        showModal.value = false;
+      };
+      showModal.value = true;
+    };
+
+    const saveAsShortcut = () => {
+      if (newShortcutName.value.trim() === '') {
+        showShortcutMessage('請輸入快捷鍵名稱', true);
+        return;
+      }
+      if (timeInputs.value.length === 0) {
+        showShortcutMessage('請至少設定一組倒數時間才能儲存快捷鍵', true);
+        return;
+      }
+      const existingShortcut = shortcuts.value.find(s => s.name === newShortcutName.value.trim());
+      if (existingShortcut) {
+        showConfirmModal(
+          `快捷鍵 ${newShortcutName.value.trim()} 已存在，是否覆蓋？`,
+          () => {
+            existingShortcut.times = timeInputs.value.map(t => ({ ...t }));
+            existingShortcut.showDetail = true;
+            showShortcutMessage(`快捷鍵 ${newShortcutName.value.trim()} 已更新`);
+            newShortcutName.value = '';
+          }
+        );
+        return;
+      } else {
+        shortcuts.value.push({
+          name: newShortcutName.value.trim(),
+          times: timeInputs.value.map(t => ({ ...t })),
+          showDetail: true
+        });
+        showShortcutMessage(`快捷鍵 ${newShortcutName.value.trim()} 已儲存`);
+      }
+      newShortcutName.value = '';
+    };
+
+    const loadShortcut = (shortcut) => {
+      timeInputs.value = shortcut.times.map(t => ({ ...t }));
+      resetTimer();
+      showShortcutMessage(`快捷鍵 ${shortcut.name} 已載入`);
+    };
+
+    const deleteShortcut = (index) => {
+      showConfirmModal(
+        `確定刪除快捷鍵 ${shortcuts.value[index].name}？`,
+        () => {
+          const deletedName = shortcuts.value[index].name;
+          shortcuts.value.splice(index, 1);
+          showShortcutMessage(`快捷鍵 ${deletedName} 已刪除`);
+        }
+      );
+    };
+
+    watch(timeInputs, () => {
+      if (!isRunning.value && !isTimerEnd.value) {
+        updateTimeDisplay();
+      }
+    }, { deep: true, immediate: true });
+
+    watch(currentCycle, () => {
+      updateTimeDisplay();
+    });
+
+    onMounted(() => {
+      // For Bootstrap modal animation (optional)
+    });
+
+    return {
+      timeInputs,
+      currentTime,
+      isRunning,
+      startTimer,
+      pauseTimer,
+      resetTimer,
+      startNextCycle,
+      addTimeInput,
+      removeTimeInput,
+      isTimerEnd,
+      isLastCycle,
+      displayCycleNumber,
+      shortcuts,
+      newShortcutName,
+      saveAsShortcut,
+      loadShortcut,
+      deleteShortcut,
+      toastList,
+      allPreview,
+      toggleAllPreview,
+      validateTimeInput,
+      showModal,
+      modalMessage,
+      modalConfirmCallback,
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
