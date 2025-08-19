@@ -227,6 +227,10 @@ createApp({
     const modalMessage = ref('');
     const modalConfirmCallback = ref(null);
 
+    // 計時器修正：以 target end timestamp 計算剩餘時間
+    let endTime = null; // 結束時間點的 timestamp (ms)
+    let pauseRemain = null; // 暫停時剩餘秒數
+
     // 初始化時全部 showDetail = true
     shortcuts.value.forEach(shortcut => {
       shortcut.showDetail = true;
@@ -250,28 +254,47 @@ createApp({
       }
     };
 
+    // 計算目前 cycle 的總秒數
+    const getCurrentCycleDuration = () => {
+      if (!timeInputs.value[currentCycle.value]) return 0;
+      const t = timeInputs.value[currentCycle.value];
+      return t.hours * 3600 + t.minutes * 60 + t.seconds;
+    };
+
     const updateTime = () => {
-      if (currentTime.value.seconds > 0) {
-        currentTime.value.seconds--;
-      } else if (currentTime.value.minutes > 0) {
-        currentTime.value.minutes--;
-        currentTime.value.seconds = 59;
-      } else if (currentTime.value.hours > 0) {
-        currentTime.value.hours--;
-        currentTime.value.minutes = 59;
-        currentTime.value.seconds = 59;
-      } else {
+      if (!endTime) return;
+      let remain = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+      // 更新 currentTime.value
+      currentTime.value.hours = Math.floor(remain / 3600);
+      currentTime.value.minutes = Math.floor((remain % 3600) / 60);
+      currentTime.value.seconds = remain % 60;
+
+      if (remain <= 0) {
         clearInterval(timerId.value);
         timerId.value = null;
         playSound(true);
         isTimerEnd.value = true;
+        isRunning.value = false;
+        endTime = null;
       }
     };
 
     const startTimer = () => {
       if (!isRunning.value && !isTimerEnd.value && timeInputs.value.length > 0) {
         isRunning.value = true;
-        timerId.value = setInterval(updateTime, 1000);
+        // 設置 endTime
+        let duration;
+        if (pauseRemain !== null) {
+          duration = pauseRemain;
+        } else {
+          duration = getCurrentCycleDuration();
+        }
+        endTime = Date.now() + duration * 1000;
+        // 立即刷新一次
+        updateTime();
+        // 降低 interval 頻率可以用 200~500ms，避免主動延遲
+        timerId.value = setInterval(updateTime, 200);
+        pauseRemain = null;
       }
     };
 
@@ -281,6 +304,11 @@ createApp({
         timerId.value = null;
       }
       isRunning.value = false;
+      // 計算剩餘秒數
+      if (endTime) {
+        pauseRemain = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+      }
+      endTime = null;
     };
 
     const resetTimer = () => {
@@ -294,6 +322,8 @@ createApp({
         currentTime.value = { hours: 0, minutes: 0, seconds: 0, label: '' };
       }
       isRunning.value = false;
+      endTime = null;
+      pauseRemain = null;
     };
 
     const playSound = (loop = false) => {
@@ -319,6 +349,8 @@ createApp({
       currentCycle.value++;
       if (currentCycle.value < timeInputs.value.length) {
         currentTime.value = { ...timeInputs.value[currentCycle.value] };
+        endTime = null;
+        pauseRemain = null;
         startTimer();
       } else {
         resetTimer();
@@ -375,7 +407,6 @@ createApp({
         show: true,
       });
       await nextTick();
-      // Bootstrap toast optional, just show for 5 seconds
       setTimeout(() => {
         toastList.value = toastList.value.filter(t => t.id !== id);
       }, 5000);
