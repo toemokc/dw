@@ -43,6 +43,7 @@
       <div v-if="timeInputs.length === 0" class="alert alert-info mb-3">
         目前沒有任何倒數時間組。請點擊「新增一組」開始設定。
       </div>
+      <button class="btn btn-primary mb-2" @click="addTimeInput">新增一組</button>
       <div v-for="(time, index) in timeInputs" :key="index" class="row g-2 align-items-center mb-2">
         <div class="col-md-3">
           <input type="text" class="form-control" v-model="time.label" placeholder="請輸入名稱">
@@ -87,7 +88,6 @@
           <button class="btn btn-danger" @click="removeTimeInput(index)" :disabled="timeInputs.length <= 0">刪除</button>
         </div>
       </div>
-      <button class="btn btn-primary mt-2" @click="addTimeInput">新增一組</button>
     </div>
   </div>
   <!-- 快捷鍵 -->
