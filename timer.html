@@ -154,7 +154,7 @@
           type="button"
           class="btn-close btn-close-white me-2 m-auto"
           aria-label="Close"
-          @click="toastList = toastList.filter(t => t.id !== toast.id)"
+          @click="removeToast(toast.id)"
         ></button>
       </div>
     </div>
@@ -271,6 +271,7 @@ createApp({
     const displayCycleNumber = computed(() => currentCycle.value + 1);
     const isLastCycle = computed(() => currentCycle.value === timeInputs.value.length - 1);
 
+    // Helper for updating currentTime from cycle
     const updateTimeDisplay = () => {
       if (timeInputs.value.length > 0) {
         currentTime.value = { ...timeInputs.value[currentCycle.value] };
@@ -278,6 +279,9 @@ createApp({
         currentTime.value = { hours: 0, minutes: 0, seconds: 0, label: '' };
       }
     };
+
+    // Helper for cloning timer array
+    const cloneTimes = times => times.map(t => ({ ...t }));
 
     // 計算目前 cycle 的總秒數
     const getCurrentCycleDuration = () => {
@@ -345,14 +349,10 @@ createApp({
       stopSound();
       currentCycle.value = 0;
       isTimerEnd.value = false;
-      if (timeInputs.value.length > 0) {
-        currentTime.value = { ...timeInputs.value[currentCycle.value] };
-      } else {
-        currentTime.value = { hours: 0, minutes: 0, seconds: 0, label: '' };
-      }
-      isRunning.value = false;
+      updateTimeDisplay();
       endTime = null;
       pauseRemain = null;
+      // isRunning.value = false; // Removed as pauseTimer() already sets this.
       updateDocumentTitle();
     };
     
@@ -382,7 +382,7 @@ createApp({
       pauseTimer();
       currentCycle.value++;
       if (currentCycle.value < timeInputs.value.length) {
-        currentTime.value = { ...timeInputs.value[currentCycle.value] };
+        updateTimeDisplay();
         endTime = null;
         pauseRemain = null;
         startTimer();
@@ -432,17 +432,21 @@ createApp({
       }
     };
 
+    // Toast removal helper
+    const removeToast = (id) => {
+      toastList.value = toastList.value.filter(t => t.id !== id);
+    };
+
     const showShortcutMessage = async (message, isError = false) => {
       const id = ++toastId;
       toastList.value.push({
         id,
         message,
-        type: isError ? 'danger' : 'success',
-        show: true,
+        type: isError ? 'danger' : 'success'
       });
       await nextTick();
       setTimeout(() => {
-        toastList.value = toastList.value.filter(t => t.id !== id);
+        removeToast(id);
       }, 5000);
     };
 
@@ -469,7 +473,7 @@ createApp({
         showConfirmModal(
           `快捷鍵 ${newShortcutName.value.trim()} 已存在，是否覆蓋？`,
           () => {
-            existingShortcut.times = timeInputs.value.map(t => ({ ...t }));
+            existingShortcut.times = cloneTimes(timeInputs.value);
             existingShortcut.showDetail = true;
             showShortcutMessage(`快捷鍵 ${newShortcutName.value.trim()} 已更新`);
             newShortcutName.value = '';
@@ -479,7 +483,7 @@ createApp({
       } else {
         shortcuts.value.push({
           name: newShortcutName.value.trim(),
-          times: timeInputs.value.map(t => ({ ...t })),
+          times: cloneTimes(timeInputs.value),
           showDetail: true
         });
         showShortcutMessage(`快捷鍵 ${newShortcutName.value.trim()} 已儲存`);
@@ -488,7 +492,7 @@ createApp({
     };
 
     const loadShortcut = (shortcut) => {
-      timeInputs.value = shortcut.times.map(t => ({ ...t }));
+      timeInputs.value = cloneTimes(shortcut.times);
       resetTimer();
       showShortcutMessage(`快捷鍵 ${shortcut.name} 已載入`);
     };
@@ -543,6 +547,7 @@ createApp({
       showModal,
       modalMessage,
       modalConfirmCallback,
+      removeToast, // new helper
     };
   }
 }).mount('#app');
