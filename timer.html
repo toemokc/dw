@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>倒數計時器</title>
+  <title>Timer</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <!-- Bootstrap CSS & Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css">
@@ -234,6 +234,19 @@ createApp({
       }
     };
 
+    //Fix audiolocked at the 1st time
+    let audioUnlocked = false;
+    const unlockAudio = () => {
+      if (!audioUnlocked) {
+        const audio = new Audio('https://cdn.pixabay.com/audio/2022/03/13/audio_1a8216f82a.mp3');
+        audio.muted = true;
+        audio.play().then(() => {
+          audio.pause();
+          audioUnlocked = true;
+        });
+      }
+    };
+
     // Modal
     const showModal = ref(false);
     const modalMessage = ref('');
@@ -293,6 +306,7 @@ createApp({
     };
 
     const startTimer = () => {
+      unlockAudio();
       if (!isRunning.value && !isTimerEnd.value && timeInputs.value.length > 0) {
         isRunning.value = true;
         // 設置 endTime
